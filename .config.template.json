@@ -1,0 +1,23 @@
+{
+	"token": "",
+	"database": "localhost:",
+	"jiraUrl": "http://tracker.firebirdsql.org",
+	"attachmentsProject": "firebird-issue-importer/legacy-attachments",
+	"attachmentsBranch": "main",
+	"projects": {
+		"CORE": "firebird-issue-importer/fb-issues-core",
+		"DNET": "firebird-issue-importer/fb-issues-dnet",
+		"DOC": "firebird-issue-importer/fb-issues-doc",
+		"JDBC": "firebird-issue-importer/fb-issues-others",
+		"ODBC": "firebird-issue-importer/fb-issues-others",
+		"PYFB": "firebird-issue-importer/fb-issues-others",
+		"QA": "firebird-issue-importer/fb-issues-others",
+		"WEB": "firebird-issue-importer/fb-issues-others"
+	},
+	"suppressTickets": [
+		"CORE-5342"
+	],
+	"usersMap": {
+		"asfernandes": "asfernandes"
+	}
+}
