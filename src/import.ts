@@ -23,6 +23,7 @@ interface JiraIssue {
 	ISS_DESCRIPTION: Blob;
 	ISS_CREATED: Date;
 	ISS_UPDATED: Date;
+	ISS_RESOLVED: Date;
 	ISS_CLOSED: Date;
 	ISS_FIX_VERSIONS: string;
 	ISS_COMPONENTS: string;
@@ -197,7 +198,7 @@ async function createGitHubIssueComments(jira: JiraIssueComments) {
 				updated_at: jira.issue.ISS_UPDATED,
 				assignee: useAssigneeField ? config.usersMap[jira.issue.ISS_ASSIGNEE] : undefined,
 				closed_at: jira.issue.ISS_STATUS == 'Resolved' || jira.issue.ISS_STATUS == 'Closed' ?
-					(jira.issue.ISS_CLOSED ?? jira.issue.ISS_UPDATED) : undefined,
+					(jira.issue.ISS_RESOLVED ?? jira.issue.ISS_CLOSED ?? jira.issue.ISS_UPDATED) : undefined,
 				closed: jira.issue.ISS_STATUS == 'Resolved' || jira.issue.ISS_STATUS == 'Closed' ? true : false
 			},
 			comments: jira.comments.map((comment, index) => ({
@@ -243,7 +244,15 @@ async function run() {
 		          join changeitem chaite
 		            on chaite.groupid = chagro.id
 		          where chaite.field = 'status' and
-		                chaite.newstring in ('Closed', 'Resolved') and
+		                chaite.newstring = 'Resolved' and
+		                chagro.issueid = iss.id
+		       ) iss_resolved,
+		       (select max(chagro.created)
+		          from changegroup chagro
+		          join changeitem chaite
+		            on chaite.groupid = chagro.id
+		          where chaite.field = 'status' and
+		                chaite.newstring = 'Closed' and
 		                chagro.issueid = iss.id
 		       ) iss_closed,
 		       iss.votes iss_votes,
