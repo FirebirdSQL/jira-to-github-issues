@@ -12,5 +12,6 @@
 - Try to edit CORE-5342 to decrease its size
 - Enable issues in each project
 - Create attachments repository and import files filtering out security issues
-- Import
-- Check import
+- `yarn run clone-repositories`
+- `yarn run import`
+- `yarn run import-check`

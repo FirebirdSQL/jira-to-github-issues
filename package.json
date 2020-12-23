@@ -4,6 +4,7 @@
   "author": "Adriano dos Santos Fernandes <adrianosf@gmail.com>",
   "license": "MIT",
   "scripts": {
+    "clone-repositories": "ts-node src/clone-repositories.ts",
     "import": "ts-node src/import.ts",
     "import-check": "ts-node src/import-check.ts"
   },
