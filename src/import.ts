@@ -25,6 +25,7 @@ interface JiraIssue {
 	ISS_UPDATED: Date;
 	ISS_RESOLVED: Date;
 	ISS_CLOSED: Date;
+	ISS_VERSIONS: string;
 	ISS_FIX_VERSIONS: string;
 	ISS_COMPONENTS: string;
 	ISS_LINKS: string;
@@ -146,6 +147,7 @@ async function createGitHubIssueComments(jira: JiraIssueComments) {
 		return commentDescription;
 	}));
 
+	const affectVersions = jira.issue.ISS_VERSIONS?.split(',') ?? [];
 	const fixVersions = jira.issue.ISS_FIX_VERSIONS?.split(',') ?? [];
 	const components = jira.issue.ISS_COMPONENTS?.split(',') ?? [];
 
@@ -160,6 +162,7 @@ async function createGitHubIssueComments(jira: JiraIssueComments) {
 		);
 
 	const labels = [
+		...affectVersions.map(s => `affect-version: ${s}`),
 		...fixVersions.map(s => `fix-version: ${s}`),
 		...components.map(s => `component: ${s}`),
 		...(jira.issue.ISS_TYPE ? [`type: ${jira.issue.ISS_TYPE}`] : [])
@@ -256,6 +259,14 @@ async function run() {
 		                chagro.issueid = iss.id
 		       ) iss_closed,
 		       iss.votes iss_votes,
+		       (select cast(list(trim(projver.vname), ',') as varchar(6000))
+		          from nodeassociation nodass
+		          join projectversion projver
+		            on projver.id = nodass.sink_node_id
+		          where nodass.source_node_entity = 'Issue' and
+		                nodass.association_type = 'IssueVersion' and
+		                nodass.source_node_id = iss.id
+		       ) iss_versions,
 		       (select cast(list(trim(projver.vname), ',') as varchar(6000))
 		          from nodeassociation nodass
 		          join projectversion projver
