@@ -168,6 +168,7 @@ async function createGitHubIssueComments(jira: JiraIssueComments) {
 	const labels = [
 		...affectVersions.map(s => `affect-version: ${s}`),
 		...fixVersions.map(s => `fix-version: ${s}`),
+		...(jira.issue.ISS_RESOLUTION ? [`resolution: ${jira.issue.ISS_RESOLUTION}`] : []),
 		...components.map(s => `component: ${s}`),
 		...(jira.issue.ISS_TYPE ? [`type: ${jira.issue.ISS_TYPE}`] : [])
 	];
@@ -248,7 +249,10 @@ async function run() {
 		       iss.description iss_description,
 		       iss.environment iss_environment,
 		       iss.priority iss_priority,
-		       res.pname iss_resolution,
+		       decode(res.pname,
+		           'Won''t Fix', 'wontfix',
+		           lower(res.pname)
+		       ) iss_resolution,
 		       sta.pname iss_status,
 		       lower(typ.pname) iss_type,
 		       iss.created iss_created,
