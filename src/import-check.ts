@@ -38,7 +38,7 @@ async function run() {
 		  where pr.pkey in (${projectList}) and
 		        iss.gh_import_url is not null and
 		        iss.gh_imported_url is null and
-		        iss.gh_imported_status_text is null
+		        (iss.gh_imported_status_text is null or iss.gh_imported_status_text = 'pending')
 		  order by iss.project,
 		           cast(substring(iss.pkey from position('-' in iss.pkey) + 1) as numeric(10))
 		`);
