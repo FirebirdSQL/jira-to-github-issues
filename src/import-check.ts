@@ -52,36 +52,42 @@ async function run() {
 		  where id = ?
 	`)
 
-	const issues = await resultSet.fetchAsObject<JiraGitHubIssue>();
+	top:
+	while (true) {
+		const issues = await resultSet.fetchAsObject<JiraGitHubIssue>();
 
-	for (const issue of issues) {
-		try {
-			const ret = await request(`GET ${issue.ISS_GH_IMPORT_URL}`, {
-				headers: {
-					authorization: `token ${config.token}`,
-					accept: 'application/vnd.github.golden-comet-preview+json'
-				}
-			});
-
-			console.info(`Checking import of ${issue.ISS_PKEY}: ${ret.status} - ${ret.data?.status}`);
-
-			const resultBlob = await attachment.createBlob(transaction);
-			await resultBlob.write(Buffer.from(JSON.stringify(ret), 'utf-8'));
-			await resultBlob.close();
-
-			await updateIssue.execute(transaction, [
-				resultBlob,
-				ret.status,
-				ret.data?.status,
-				ret.data?.issue_url,
-				issue.ISS_ID
-			]);
-
-			await transaction.commitRetaining();
-		}
-		catch (e) {
-			console.error(`Error checking import of ${issue.ISS_PKEY}: ${e}`);
+		if (issues.length == 0)
 			break;
+
+		for (const issue of issues) {
+			try {
+				const ret = await request(`GET ${issue.ISS_GH_IMPORT_URL}`, {
+					headers: {
+						authorization: `token ${config.token}`,
+						accept: 'application/vnd.github.golden-comet-preview+json'
+					}
+				});
+
+				console.info(`Checking import of ${issue.ISS_PKEY}: ${ret.status} - ${ret.data?.status}`);
+
+				const resultBlob = await attachment.createBlob(transaction);
+				await resultBlob.write(Buffer.from(JSON.stringify(ret), 'utf-8'));
+				await resultBlob.close();
+
+				await updateIssue.execute(transaction, [
+					resultBlob,
+					ret.status,
+					ret.data?.status,
+					ret.data?.issue_url,
+					issue.ISS_ID
+				]);
+
+				await transaction.commitRetaining();
+			}
+			catch (e) {
+				console.error(`Error checking import of ${issue.ISS_PKEY}: ${e}`);
+				break top;
+			}
 		}
 	}
 

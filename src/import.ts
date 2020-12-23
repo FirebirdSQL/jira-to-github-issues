@@ -331,37 +331,42 @@ async function run() {
 		  where id = ?
 	`)
 
-	//// FIXME: loop
-	const rows = await resultSet.fetchAsObject<JiraIssue & JiraComment>();
 	const jiraIssuesComments: JiraIssueComments[] = [];
 	let lastIssueComments: JiraIssueComments = null;
 
-	for (const row of rows) {
-		if (row.ISS_ID != lastIssueComments?.issue.ISS_ID) {
-			lastIssueComments = Object.keys(row)
-				.filter(key => key.startsWith('ISS_'))
-				.reduce(
-					(obj: JiraIssueComments, key) => {
-						(obj.issue as any)[key] = (row as any)[key];
-						return obj;
-					},
-					{ issue: {}, comments: [] } as unknown as JiraIssueComments
+	while (true) {
+		const rows = await resultSet.fetchAsObject<JiraIssue & JiraComment>();
+
+		if (rows.length == 0)
+			break;
+
+		for (const row of rows) {
+			if (row.ISS_ID != lastIssueComments?.issue.ISS_ID) {
+				lastIssueComments = Object.keys(row)
+					.filter(key => key.startsWith('ISS_'))
+					.reduce(
+						(obj: JiraIssueComments, key) => {
+							(obj.issue as any)[key] = (row as any)[key];
+							return obj;
+						},
+						{ issue: {}, comments: [] } as unknown as JiraIssueComments
+					);
+
+				jiraIssuesComments.push(lastIssueComments);
+			}
+
+			if (row.COM_ID) {
+				lastIssueComments.comments.push(Object.keys(row)
+					.filter(key => key.startsWith('COM_'))
+					.reduce(
+						(obj: JiraComment, key) => {
+							(obj as any)[key] = (row as any)[key];
+							return obj;
+						},
+						{} as JiraComment
+					)
 				);
-
-			jiraIssuesComments.push(lastIssueComments);
-		}
-
-		if (row.COM_ID) {
-			lastIssueComments.comments.push(Object.keys(row)
-				.filter(key => key.startsWith('COM_'))
-				.reduce(
-					(obj: JiraComment, key) => {
-						(obj as any)[key] = (row as any)[key];
-						return obj;
-					},
-					{} as JiraComment
-				)
-			);
+			}
 		}
 	}
 
