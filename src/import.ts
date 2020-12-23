@@ -6,6 +6,7 @@ import {
 	Transaction
 } from 'node-firebird-driver-native';
 
+import * as fs from 'fs';
 import { request } from '@octokit/request';
 import * as linkify  from 'linkify-it';
 import { gfm } from 'markdown-escapes';
@@ -52,6 +53,9 @@ interface JiraIssueComments {
 
 let attachment: Attachment;
 let transaction: Transaction;
+
+
+const logs = new Map(JSON.parse(fs.readFileSync('repositories/logs.json').toString('utf8')) as [string, string[]][]);
 
 
 //// TODO: Use display name for Jira users.
@@ -168,6 +172,8 @@ async function createGitHubIssueComments(jira: JiraIssueComments) {
 		...(jira.issue.ISS_TYPE ? [`type: ${jira.issue.ISS_TYPE}`] : [])
 	];
 
+	const commits = logs.get(jira.issue.ISS_PKEY);
+
 	//// FIXME: Error importing CORE-5342: HttpError: Payload too big: 1048576 bytes are allowed, 1314299 bytes were posted.
 
 	const useAssigneeField = jira.issue.ISS_ASSIGNEE != undefined && config.usersMap.contributors[jira.issue.ISS_ASSIGNEE] != undefined;
@@ -188,7 +194,12 @@ async function createGitHubIssueComments(jira: JiraIssueComments) {
 			''
 		) +
 		(jira.issue.ISS_VOTES > 0 ? `Votes: ${jira.issue.ISS_VOTES}\n\n` : '') +
-		transformReferences(textToMarkdown(simplifyJiraLinks(description)));
+		transformReferences(textToMarkdown(simplifyJiraLinks(description))) +
+		(commits?.length > 0 ?
+			`\n\nCommits: ` + commits.join(' ')
+			:
+			''
+		);
 
 	return {
 		jira,
