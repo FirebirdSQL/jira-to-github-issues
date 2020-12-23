@@ -8,6 +8,7 @@
     "experimentalDecorators": true,
     "lib": [
       "es6",
+      "es2019.array",
       "es2020.string"
     ],
     "strictNullChecks": false,

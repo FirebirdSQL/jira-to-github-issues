@@ -13,5 +13,6 @@
 - Enable issues in each project
 - Create attachments repository and import files filtering out security issues
 - `yarn run clone-repositories`
+- `yarn run parse-logs`
 - `yarn run import`
 - `yarn run import-check`

@@ -373,7 +373,6 @@ async function run() {
 	const issues = await Promise.all(jiraIssuesComments.map(createGitHubIssueComments));
 
 	for (const issue of issues)
-	//// FIXME: for (const issue of issues.slice(0, 3))
 	{
 		try {
 			const ret = await request(`POST /repos/${config.projects[issue.jira.issue.ISS_PROJECT]}/import/issues`, {
@@ -414,5 +413,3 @@ async function run() {
 }
 
 run().catch(e => console.error(e));
-
-//// FIXME: git log --branches --grep=XXX- --grep=DOC-
