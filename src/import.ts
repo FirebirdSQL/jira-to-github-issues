@@ -19,7 +19,9 @@ interface JiraIssue {
 	ISS_PKEY: string;
 	ISS_PROJECT: string;
 	ISS_REPORTER: string;
+	ISS_REPORTER_NAME: string;
 	ISS_ASSIGNEE: string;
+	ISS_ASSIGNEE_NAME: string;
 	ISS_SUMMARY: string;
 	ISS_DESCRIPTION: Blob;
 	ISS_CREATED: Date;
@@ -42,6 +44,7 @@ interface JiraComment {
 	COM_ID: number;
 	COM_NUM: number;
 	COM_AUTHOR: string;
+	COM_AUTHOR_NAME: string;
 	COM_DESCRIPTION: Blob;
 	COM_CREATED: Date;
 }
@@ -58,10 +61,12 @@ let transaction: Transaction;
 const logs = new Map(JSON.parse(fs.readFileSync('repositories/logs.json').toString('utf8')) as [string, string[]][]);
 
 
-//// TODO: Use display name for Jira users.
-function jiraToGitHubUser(jiraName: string): string {
+function userName(jiraName: string, fullName: string): string {
 	const mappedName = allUsers[jiraName];
-	return mappedName ? `@${mappedName}` : jiraName;
+
+	return mappedName ? `@${mappedName}` :
+		fullName ? `${fullName} (${jiraName})`:
+		jiraName;
 }
 
 
@@ -180,8 +185,12 @@ async function createGitHubIssueComments(jira: JiraIssueComments) {
 	const useAssigneeField = jira.issue.ISS_ASSIGNEE != undefined && config.usersMap.contributors[jira.issue.ISS_ASSIGNEE] != undefined;
 
 	const body =
-		`Submitted by: ${jiraToGitHubUser(jira.issue.ISS_REPORTER)}\n\n` +
-		(!useAssigneeField && jira.issue.ISS_ASSIGNEE ? `Assigned to: ${jiraToGitHubUser(jira.issue.ISS_ASSIGNEE)}\n\n` : '') +
+		`Submitted by: ${userName(jira.issue.ISS_REPORTER, jira.issue.ISS_REPORTER_NAME)}\n\n` +
+		(!useAssigneeField && jira.issue.ISS_ASSIGNEE ?
+			`Assigned to: ${userName(jira.issue.ISS_ASSIGNEE, jira.issue.ISS_ASSIGNEE_NAME)}\n\n`
+			:
+			''
+		) +
 		(links.length > 0 ?
 			transformReferences(textToMarkdown(links.map(link =>
 				`${link[0].substr(0, 1).toUpperCase()}${link[0].substr(1)} ${link[1]}`).join('\n')
@@ -218,7 +227,7 @@ async function createGitHubIssueComments(jira: JiraIssueComments) {
 			},
 			comments: jira.comments.map((comment, index) => ({
 				body:
-					`Commented by: ${jiraToGitHubUser(comment.COM_AUTHOR)}\n\n` +
+					`Commented by: ${userName(comment.COM_AUTHOR, comment.COM_AUTHOR_NAME)}\n\n` +
 					transformReferences(textToMarkdown(simplifyJiraLinks(commentsDescriptions[index]))),
 				created_at: comment.COM_CREATED
 			}))
@@ -244,7 +253,27 @@ async function run() {
 		       iss.pkey iss_pkey,
 		       pr.pkey iss_project,
 		       iss.reporter iss_reporter,
+		       (select cast(propstr.propertyvalue as varchar(128))
+		          from userbase usrbas
+		          join propertyentry propentr
+		            on propentr.entity_name = 'OSUser' and
+		               propentr.property_key = 'fullName' and
+		               propentr.entity_id = usrbas.id
+		          join propertystring propstr
+		            on propstr.id = propentr.id
+		          where usrbas.username = iss.reporter
+		       ) iss_reporter_name,
 		       iss.assignee iss_assignee,
+		       (select cast(propstr.propertyvalue as varchar(128))
+		          from userbase usrbas
+		          join propertyentry propentr
+		            on propentr.entity_name = 'OSUser' and
+		               propentr.property_key = 'fullName' and
+		               propentr.entity_id = usrbas.id
+		          join propertystring propstr
+		            on propstr.id = propentr.id
+		          where usrbas.username = iss.assignee
+		       ) iss_assignee_name,
 		       iss.summary iss_summary,
 		       iss.description iss_description,
 		       iss.environment iss_environment,
@@ -314,6 +343,16 @@ async function run() {
 		       act.id com_id,
 		       act.actionnum com_num,
 		       act.author com_author,
+		       (select cast(propstr.propertyvalue as varchar(128))
+		          from userbase usrbas
+		          join propertyentry propentr
+		            on propentr.entity_name = 'OSUser' and
+		               propentr.property_key = 'fullName' and
+		               propentr.entity_id = usrbas.id
+		          join propertystring propstr
+		            on propstr.id = propentr.id
+		          where usrbas.username = act.author
+		       ) com_author_name,
 		       act.actionbody com_description,
 		       act.created com_created
 		  from jiraissue iss
