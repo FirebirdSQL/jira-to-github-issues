@@ -2,8 +2,9 @@
 
 - Ensure jira database is updated and clean from previous import tests
 - Copy `.config.template.json` to `.config.json`
+- Add `firebird-issue-importer` to `FirebirdSQL` organization
 - Configure `.config.json`
-  - Set token
+  - Set token (using `firebird-issue-importer` account)
   - Set database (better to not use embedded)
   - Set project mappings
   - Set usersMap mappings
