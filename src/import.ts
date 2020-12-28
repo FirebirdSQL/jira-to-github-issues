@@ -180,6 +180,7 @@ async function createGitHubIssueComments(jira: JiraIssueComments) {
 
 	const commits = logs.get(jira.issue.ISS_PKEY);
 
+	//// FIXME: Error importing CORE-2521: HttpError: Payload too big: 1048576 bytes are allowed, 2318098 bytes were posted.
 	//// FIXME: Error importing CORE-5342: HttpError: Payload too big: 1048576 bytes are allowed, 1314299 bytes were posted.
 
 	const useAssigneeField = jira.issue.ISS_ASSIGNEE != undefined && config.usersMap.contributors[jira.issue.ISS_ASSIGNEE] != undefined;
