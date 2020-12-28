@@ -367,7 +367,6 @@ async function run() {
 		  left join jiraaction act
 		    on act.issueid = iss.id
 		  where pr.pkey in (${projectList}) and
-		        iss.security is null and
 		        iss.gh_import_status_code is null
 		        ${suppressTicketsClause}
 		  order by iss.project,
