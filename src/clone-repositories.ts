@@ -6,7 +6,7 @@ import { config } from './config';
 async function run() {
 	for (const project in config.projects) {
 		const dirName = `./repositories/${project}`;
-		const url = `https://github.com/${config.projects[project]}.git`;
+		const url = `git@github.com:${config.projects[project]}.git`;
 
 		mkdirSync(dirName, { recursive: true });
 
