@@ -11,7 +11,7 @@ import { request } from '@octokit/request';
 import * as linkify  from 'linkify-it';
 import { gfm } from 'markdown-escapes';
 
-import { allUsers, config } from './config';
+import { config } from './config';
 
 
 interface JiraIssue {
@@ -62,7 +62,7 @@ const logs = new Map(JSON.parse(fs.readFileSync('repositories/logs.json').toStri
 
 
 function userName(jiraName: string, fullName: string): string {
-	const mappedName = allUsers[jiraName];
+	const mappedName = config.usersMap[jiraName];
 
 	return mappedName ? `@${mappedName}` :
 		fullName ? `${fullName} (${jiraName})`:
@@ -125,7 +125,7 @@ function transformReferences(text: string): string {
 	return text;
 }
 
-async function createGitHubIssueComments(jira: JiraIssueComments) {
+async function createGitHubIssueComments(jira: JiraIssueComments, collaborators: Set<string>) {
 	let description = '';
 
 	if (jira.issue.ISS_DESCRIPTION) {
@@ -183,7 +183,9 @@ async function createGitHubIssueComments(jira: JiraIssueComments) {
 	//// FIXME: Error importing CORE-2521: HttpError: Payload too big: 1048576 bytes are allowed, 2318098 bytes were posted.
 	//// FIXME: Error importing CORE-5342: HttpError: Payload too big: 1048576 bytes are allowed, 1314299 bytes were posted.
 
-	const useAssigneeField = jira.issue.ISS_ASSIGNEE != undefined && config.usersMap.contributors[jira.issue.ISS_ASSIGNEE] != undefined;
+	const useAssigneeField = jira.issue.ISS_ASSIGNEE != undefined &&
+		config.usersMap[jira.issue.ISS_ASSIGNEE] != undefined &&
+		collaborators?.has(config.usersMap[jira.issue.ISS_ASSIGNEE]);
 
 	const body =
 		`Submitted by: ${userName(jira.issue.ISS_REPORTER, jira.issue.ISS_REPORTER_NAME)}\n\n` +
@@ -221,7 +223,7 @@ async function createGitHubIssueComments(jira: JiraIssueComments) {
 				labels,
 				created_at: jira.issue.ISS_CREATED,
 				updated_at: jira.issue.ISS_UPDATED,
-				assignee: useAssigneeField ? config.usersMap.contributors[jira.issue.ISS_ASSIGNEE] : undefined,
+				assignee: useAssigneeField ? config.usersMap[jira.issue.ISS_ASSIGNEE] : undefined,
 				closed_at: jira.issue.ISS_STATUS == 'Resolved' || jira.issue.ISS_STATUS == 'Closed' ?
 					(jira.issue.ISS_RESOLVED ?? jira.issue.ISS_CLOSED ?? jira.issue.ISS_UPDATED) : undefined,
 				closed: jira.issue.ISS_STATUS == 'Resolved' || jira.issue.ISS_STATUS == 'Closed' ? true : false
@@ -238,6 +240,19 @@ async function createGitHubIssueComments(jira: JiraIssueComments) {
 
 
 async function run() {
+	const collaborators = new Map(await Promise.all(
+		Object.keys(config.projects).map(async project => [
+			project,
+			new Set((await request('GET /repos/:owner/:repo/collaborators', {
+				headers: {
+					authorization: `token ${config.token}`
+				},
+				owner: config.projects[project].substring(0, config.projects[project].indexOf('/')),
+				repo: config.projects[project].substring(config.projects[project].indexOf('/') + 1)
+			})).data.map(({ login }) => login))
+		] as const)
+	));
+
 	const projectList = Object.keys(config.projects).map(p => `'${p}'`).join(', ');
 
 	const client = createNativeClient(getDefaultLibraryFilename());
@@ -424,7 +439,8 @@ async function run() {
 		}
 	}
 
-	const issues = await Promise.all(jiraIssuesComments.map(createGitHubIssueComments));
+	const issues = await Promise.all(jiraIssuesComments.map(issue =>
+		createGitHubIssueComments(issue, collaborators.get(issue.issue.ISS_PROJECT))));
 
 	for (const issue of issues)
 	{
