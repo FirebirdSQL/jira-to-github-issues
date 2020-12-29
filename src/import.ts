@@ -118,6 +118,7 @@ function transformReferences(text: string): string {
 	for (const match of matches) {
 		const project = match[1];
 		text = text.substring(0, match.index) + '[' +
+			//// FIXME: This filter does not work correct. Example: https://github.com/FirebirdSQL/jira-test-core/issues?q=CORE-1+in%3Atitle
 			match[0] + `](https://github.com/${config.projects[project]}/issues?q=${match[0]}+in%3Atitle)` +
 			text.substring(match.index + match[0].length);
 	}
@@ -179,9 +180,6 @@ async function createGitHubIssueComments(jira: JiraIssueComments, collaborators:
 	];
 
 	const commits = logs.get(jira.issue.ISS_PKEY);
-
-	//// FIXME: Error importing CORE-2521: HttpError: Payload too big: 1048576 bytes are allowed, 2318098 bytes were posted.
-	//// FIXME: Error importing CORE-5342: HttpError: Payload too big: 1048576 bytes are allowed, 1314299 bytes were posted.
 
 	const useAssigneeField = jira.issue.ISS_ASSIGNEE != undefined &&
 		config.usersMap[jira.issue.ISS_ASSIGNEE] != undefined &&
