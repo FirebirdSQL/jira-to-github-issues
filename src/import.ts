@@ -34,7 +34,7 @@ interface JiraIssue {
 	ISS_LINKS: string;
 	ISS_ATTACHMENTS: string;
 	ISS_VOTES: number;
-	//ISS_SECURITY: string;
+	ISS_SECURITY: number;
 	ISS_RESOLUTION: string;
 	ISS_STATUS: string;
 	ISS_TYPE: string;
@@ -167,7 +167,9 @@ async function createGitHubIssueComments(jira: JiraIssueComments, collaborators:
 	const attachments = (jira.issue.ISS_ATTACHMENTS?.split('|') ?? [])
 		.map(attachment => [attachment.substring(0, attachment.indexOf(':')), attachment.substring(attachment.indexOf(':') + 1)])
 		.map(([id, name]) =>
-			`[${name}](https://github.com/${config.attachmentsProject}/raw/${config.attachmentsBranch}/` +
+			`[${name}](https://github.com/` +
+			jira.issue.ISS_SECURITY ? config.privateAttachmentsProject : config.publicAttachmentsProject +
+			`/raw/${config.attachmentsBranch}/` +
 			`${jira.issue.ISS_PROJECT}/${jira.issue.ISS_PKEY}/${id}_${encodeURIComponent(name)})`
 		);
 
@@ -317,6 +319,7 @@ async function run() {
 		                chagro.issueid = iss.id
 		       ) iss_closed,
 		       iss.votes iss_votes,
+		       iss.security iss_security,
 		       (select cast(list(trim(projver.vname), ',') as varchar(6000))
 		          from nodeassociation nodass
 		          join projectversion projver

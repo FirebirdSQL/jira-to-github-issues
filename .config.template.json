@@ -2,7 +2,8 @@
 	"token": "",
 	"database": "localhost:",
 	"jiraUrl": "http://tracker.firebirdsql.org",
-	"attachmentsProject": "firebird-issue-importer/legacy-attachments",
+	"publicAttachmentsProject": "firebird-issue-importer/legacy-attachments",
+	"privateAttachmentsProject": "firebird-issue-importer/legacy-attachments-private",
 	"attachmentsBranch": "main",
 	"projects": {
 		"CORE": "firebird-issue-importer/fb-issues-core",

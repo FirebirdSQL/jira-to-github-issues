@@ -8,11 +8,12 @@
   - Set database (better to not use embedded)
   - Set project mappings
   - Set usersMap mappings
-  - Set attachments project URL
+  - Set attachments public and private project URLs
 - Edit CORE-2521 and CORE-5342 to decrease they size
 - Enable issues in each project
-- Create attachments repository and import files (filtering out security issues?)
+- Create attachments repository and import files
 - `yarn run clone-repositories`
 - `yarn run parse-logs`
 - `yarn run import`
 - `yarn run import-check`
+- Check import with `check.sql`

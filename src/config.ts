@@ -5,7 +5,8 @@ interface Config {
 	token: string;
 	database: string;
 	jiraUrl: string;
-	attachmentsProject: string;
+	publicAttachmentsProject: string;
+	privateAttachmentsProject: string;
 	attachmentsBranch: string;
 	projects: {
 		[index: string]: string;
