@@ -7,7 +7,8 @@
     "clone-repositories": "ts-node src/clone-repositories.ts",
     "import": "ts-node src/import.ts",
     "import-check": "ts-node src/import-check.ts",
-    "parse-logs": "ts-node src/parse-logs.ts"
+    "parse-logs": "ts-node src/parse-logs.ts",
+    "write-result": "ts-node src/write-result.ts"
   },
   "devDependencies": {
     "ts-node": "^9.0.0",
