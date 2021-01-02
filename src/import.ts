@@ -65,7 +65,7 @@ function userName(jiraName: string, fullName: string): string {
 	const mappedName = config.usersMap[jiraName];
 
 	return mappedName ? `@${mappedName}` :
-		fullName ? `${fullName} (${jiraName})`:
+		fullName ? `${fullName.replace(/@/g, '_')} (${jiraName.replace(/@/g, '_')})`:
 		jiraName;
 }
 
