@@ -17,3 +17,5 @@
 - `yarn run import`
 - `yarn run import-check`
 - Check import with `check.sql`
+- `yarn run write-result`
+- Commit `import-result.json`
