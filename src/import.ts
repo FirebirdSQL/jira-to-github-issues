@@ -41,8 +41,6 @@ interface JiraIssue {
 }
 
 interface JiraComment {
-	COM_ID: number;
-	COM_NUM: number;
 	COM_AUTHOR: string;
 	COM_AUTHOR_NAME: string;
 	COM_DESCRIPTION: Blob;
@@ -265,8 +263,62 @@ async function run() {
 		'';
 
 	const resultSet = await attachment.executeQuery(transaction, `
-		select iss.id iss_id,
-		       iss.pkey iss_pkey,
+		with qiss as (
+		    select iss.id
+		      from jiraissue iss
+		      join project pr
+		        on pr.id = iss.project
+		      where pr.pkey in (${projectList}) and
+		            iss.gh_import_status_code is null
+		            ${suppressTicketsClause}
+		),
+		qcom as (
+		    select qiss.id iss_id,
+		           act.author com_author,
+		           (select cast(propstr.propertyvalue as varchar(128))
+		              from userbase usrbas
+		              join propertyentry propentr
+		                on propentr.entity_name = 'OSUser' and
+		                   propentr.property_key = 'fullName' and
+		                   propentr.entity_id = usrbas.id
+		              join propertystring propstr
+		                on propstr.id = propentr.id
+		              where usrbas.username = act.author
+		           ) com_author_name,
+		           act.actionbody com_description,
+		           act.created com_created
+		      from qiss
+		      join jiraaction act
+		        on act.issueid = qiss.id
+		    union all
+		    select qiss.id iss_id,
+		           cg.author com_author,
+		           (select cast(propstr.propertyvalue as varchar(128))
+		              from userbase usrbas
+		              join propertyentry propentr
+		                on propentr.entity_name = 'OSUser' and
+		                   propentr.property_key = 'fullName' and
+		                   propentr.entity_id = usrbas.id
+		              join propertystring propstr
+		                on propstr.id = propentr.id
+		              where usrbas.username = cg.author
+		           ) com_author_name,
+		           list(
+		               ci.field || ': ' ||
+		                   coalesce(ci.oldstring || ' ', '') || coalesce('[ ' || ci.oldvalue || ' ]', '') ||
+		                   decode(coalesce(ci.oldstring || ci.oldvalue, ''), '', '', ' => ') ||
+		                   coalesce(ci.newstring || ' ', '') || coalesce('[ ' || ci.newvalue || ' ]', ''),
+		               ascii_char(13) || ascii_char(10)
+		           ) com_description,
+		           cg.created com_created
+		      from qiss
+		      join changegroup cg
+		        on cg.issueid = qiss.id
+		      join changeitem ci
+		        on ci.groupid = cg.id
+		      group by qiss.id, cg.id, cg.author, cg.created
+		)
+		select iss.pkey iss_pkey,
 		       pr.pkey iss_project,
 		       iss.reporter iss_reporter,
 		       (select cast(propstr.propertyvalue as varchar(128))
@@ -356,23 +408,10 @@ async function run() {
 		          from fileattachment att
 		          where att.issueid = iss.id
 		       ) iss_attachments,
-		       iss.votes iss_votes,
-		       act.id com_id,
-		       act.actionnum com_num,
-		       act.author com_author,
-		       (select cast(propstr.propertyvalue as varchar(128))
-		          from userbase usrbas
-		          join propertyentry propentr
-		            on propentr.entity_name = 'OSUser' and
-		               propentr.property_key = 'fullName' and
-		               propentr.entity_id = usrbas.id
-		          join propertystring propstr
-		            on propstr.id = propentr.id
-		          where usrbas.username = act.author
-		       ) com_author_name,
-		       act.actionbody com_description,
-		       act.created com_created
-		  from jiraissue iss
+		       qcom.*
+		  from qiss
+		  join jiraissue iss
+		    on iss.id = qiss.id
 		  join project pr
 		    on pr.id = iss.project
 		  left join resolution res
@@ -381,14 +420,11 @@ async function run() {
 		    on sta.id = iss.issuestatus
 		  left join issuetype typ
 		    on typ.id = iss.issuetype
-		  left join jiraaction act
-		    on act.issueid = iss.id
-		  where pr.pkey in (${projectList}) and
-		        iss.gh_import_status_code is null
-		        ${suppressTicketsClause}
-		  order by iss.project,
+		  left join qcom
+		    on qcom.iss_id = iss.id
+		  order by pr.id,
 		           cast(substring(iss.pkey from position('-' in iss.pkey) + 1) as numeric(10)),
-		           act.created
+		           qcom.com_created
 		`);
 
 	const updateIssue = await attachment.prepare(transaction, `
@@ -425,7 +461,7 @@ async function run() {
 				jiraIssuesComments.push(lastIssueComments);
 			}
 
-			if (row.COM_ID) {
+			if (row.COM_DESCRIPTION) {
 				lastIssueComments.comments.push(Object.keys(row)
 					.filter(key => key.startsWith('COM_'))
 					.reduce(
