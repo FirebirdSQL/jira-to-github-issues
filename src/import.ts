@@ -35,6 +35,7 @@ interface JiraIssue {
 	ISS_ATTACHMENTS: string;
 	ISS_VOTES: number;
 	ISS_SECURITY: number;
+	ISS_QA_STATUS: string;
 	ISS_RESOLUTION: string;
 	ISS_STATUS: string;
 	ISS_TYPE: string;
@@ -176,7 +177,8 @@ async function createGitHubIssueComments(jira: JiraIssueComments, collaborators:
 		...fixVersions.map(s => `fix-version: ${s}`),
 		...(jira.issue.ISS_RESOLUTION ? [`resolution: ${jira.issue.ISS_RESOLUTION}`] : []),
 		...components.map(s => `component: ${s}`),
-		...(jira.issue.ISS_TYPE ? [`type: ${jira.issue.ISS_TYPE}`] : [])
+		...(jira.issue.ISS_TYPE ? [`type: ${jira.issue.ISS_TYPE}`] : []),
+		...(jira.issue.ISS_QA_STATUS ? [`qa: ${jira.issue.ISS_QA_STATUS}`] : [])
 	];
 
 	const commits = logs.get(jira.issue.ISS_PKEY);
@@ -372,6 +374,16 @@ async function run() {
 		       ) iss_closed,
 		       iss.votes iss_votes,
 		       iss.security iss_security,
+		       (select decode(cfv.stringvalue,
+		                   'Covered by another test(s)', 'covered by another tests',
+		                   lower(cfv.stringvalue)
+		               )
+		          from customfieldvalue cfv
+		          join customfield cf
+		            on cf.id = cfv.customfield and
+		               cf.cfname = 'QA Status'
+		          where cfv.issue = iss.id
+		       ) iss_qa_status,
 		       (select cast(list(trim(projver.vname), ',') as varchar(6000))
 		          from nodeassociation nodass
 		          join projectversion projver
