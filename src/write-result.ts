@@ -26,12 +26,12 @@ async function run() {
 
 	const resultSet = await attachment.executeQuery(transaction, `
 		select iss.pkey key,
-		       cast(iss.gh_import_result_json as varchar(512)) import_result_json,
+		       cast(iss.gh_import_result_json as varchar(2048)) import_result_json,
 		       iss.gh_import_status_code import_status_code,
 		       iss.gh_import_id import_id,
 		       iss.gh_import_status_text import_status_text,
 		       iss.gh_import_url import_url,
-		       cast(iss.gh_imported_result_json as varchar(512)) imported_result_json,
+		       cast(iss.gh_imported_result_json as varchar(2048)) imported_result_json,
 		       iss.gh_imported_status_code imported_status_code,
 		       iss.gh_imported_status_text imported_status_text,
 		       iss.gh_imported_url imported_url
