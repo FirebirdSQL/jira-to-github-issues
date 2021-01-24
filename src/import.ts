@@ -24,6 +24,7 @@ interface JiraIssue {
 	ISS_ASSIGNEE_NAME: string;
 	ISS_SUMMARY: string;
 	ISS_DESCRIPTION: Blob;
+	ISS_TEST_DETAILS: Blob;
 	ISS_CREATED: Date;
 	ISS_UPDATED: Date;
 	ISS_RESOLVED: Date;
@@ -139,6 +140,19 @@ async function createGitHubIssueComments(jira: JiraIssueComments, collaborators:
 		await descriptionStream.close();
 	}
 
+	let testDetails = '';
+
+	if (jira.issue.ISS_TEST_DETAILS) {
+		const testDetailsStream = await attachment.openBlob(transaction, jira.issue.ISS_TEST_DETAILS);
+		const buffer = Buffer.alloc(8192);
+		let count: number;
+
+		while ((count = await testDetailsStream.read(buffer)) != -1)
+			testDetails += buffer.slice(0, count);
+
+		await testDetailsStream.close();
+	}
+
 	const commentsDescriptions = await Promise.all(jira.comments.map(async comment => {
 		let commentDescription = '';
 
@@ -167,7 +181,7 @@ async function createGitHubIssueComments(jira: JiraIssueComments, collaborators:
 		.map(attachment => [attachment.substring(0, attachment.indexOf(':')), attachment.substring(attachment.indexOf(':') + 1)])
 		.map(([id, name]) =>
 			`[${name}](https://github.com/` +
-			jira.issue.ISS_SECURITY ? config.privateAttachmentsProject : config.publicAttachmentsProject +
+			(jira.issue.ISS_SECURITY ? config.privateAttachmentsProject : config.publicAttachmentsProject) +
 			`/raw/${config.attachmentsBranch}/` +
 			`${jira.issue.ISS_PROJECT}/${jira.issue.ISS_PKEY}/${id}_${encodeURIComponent(name)})`
 		);
@@ -210,6 +224,11 @@ async function createGitHubIssueComments(jira: JiraIssueComments, collaborators:
 		transformReferences(textToMarkdown(simplifyJiraLinks(description))) +
 		(commits?.length > 0 ?
 			`\n\nCommits: ` + commits.join(' ')
+			:
+			''
+		) +
+		(testDetails ?
+			transformReferences(textToMarkdown(simplifyJiraLinks(`\n\n====== Test Details ======\n\n${testDetails}`)))
 			:
 			''
 		);
@@ -346,6 +365,13 @@ async function run() {
 		       ) iss_assignee_name,
 		       iss.summary iss_summary,
 		       iss.description iss_description,
+		       (select cfv.textvalue
+		          from customfieldvalue cfv
+		          join customfield cf
+		            on cf.id = cfv.customfield and
+		               cf.cfname = 'Test Details'
+		          where cfv.issue = iss.id
+		       ) iss_test_details,
 		       iss.environment iss_environment,
 		       iss.priority iss_priority,
 		       decode(res.pname,
