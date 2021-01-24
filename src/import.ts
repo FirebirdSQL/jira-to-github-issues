@@ -118,8 +118,7 @@ function transformReferences(text: string): string {
 	for (const match of matches) {
 		const project = match[1];
 		text = text.substring(0, match.index) + '[' +
-			//// FIXME: This filter does not work correct. Example: https://github.com/FirebirdSQL/jira-test-core/issues?q=CORE-1+in%3Atitle
-			match[0] + `](https://github.com/${config.projects[project]}/issues?q=${match[0]}+in%3Atitle)` +
+			match[0].replace('\\-', '') + `](https://github.com/${config.projects[project]}/issues?q=${match[0].replace('\\-', '')}+in%3Atitle)` +
 			text.substring(match.index + match[0].length);
 	}
 
@@ -237,7 +236,7 @@ async function createGitHubIssueComments(jira: JiraIssueComments, collaborators:
 		jira,
 		gitHub: {
 			issue: {
-				title: `${jira.issue.ISS_SUMMARY} [${jira.issue.ISS_PKEY}]`,
+				title: `${jira.issue.ISS_SUMMARY} [${jira.issue.ISS_PKEY.replace('-', '')}]`,
 				body,
 				labels,
 				created_at: jira.issue.ISS_CREATED,
