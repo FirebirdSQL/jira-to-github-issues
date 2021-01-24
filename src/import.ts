@@ -374,8 +374,10 @@ async function run() {
 		       ) iss_closed,
 		       iss.votes iss_votes,
 		       iss.security iss_security,
-		       (select decode(cfv.stringvalue,
+		       (select decode(
+		                   cfv.stringvalue,
 		                   'Covered by another test(s)', 'covered by another tests',
+		                   'No test', null,
 		                   lower(cfv.stringvalue)
 		               )
 		          from customfieldvalue cfv
