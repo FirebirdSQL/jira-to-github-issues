@@ -14,7 +14,7 @@ interface Config {
 	usersMap: {
 		[index: string]: string;
 	};
-	suppressTickets: string[];
+	suppressTickets?: string[];
 }
 
 

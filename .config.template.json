@@ -15,9 +15,6 @@
 		"QA": "firebird-issue-importer/fb-issues-others",
 		"WEB": "firebird-issue-importer/fb-issues-others"
 	},
-	"suppressTickets": [
-		"CORE-5342"
-	],
 	"usersMap": {
 		"alexey.kovyazin": "alexeykovyazin",
 		"alexpeshkoff": "AlexPeshkoff",
