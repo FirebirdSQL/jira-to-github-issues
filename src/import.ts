@@ -271,7 +271,7 @@ async function run() {
 		] as const)
 	));
 
-	const projectList = Object.keys(config.projects).map(p => `'${p}'`).join(', ');
+	const projectList = Object.keys(config.projects).map(p => `'${p}'`);
 
 	const client = createNativeClient(getDefaultLibraryFilename());
 
@@ -281,190 +281,6 @@ async function run() {
 	const suppressTicketsClause = config.suppressTickets?.length > 0 ?
 		`and iss.pkey not in (${config.suppressTickets.map(ticket => `'${ticket}'`) .join(', ')})` :
 		'';
-
-	const resultSet = await attachment.executeQuery(transaction, `
-		with qiss as (
-		    select iss.id
-		      from jiraissue iss
-		      join project pr
-		        on pr.id = iss.project
-		      where pr.pkey in (${projectList}) and
-		            iss.gh_import_status_code is null
-		            ${suppressTicketsClause}
-		),
-		qcom as (
-		    select qiss.id iss_id,
-		           act.author com_author,
-		           (select cast(propstr.propertyvalue as varchar(128))
-		              from userbase usrbas
-		              join propertyentry propentr
-		                on propentr.entity_name = 'OSUser' and
-		                   propentr.property_key = 'fullName' and
-		                   propentr.entity_id = usrbas.id
-		              join propertystring propstr
-		                on propstr.id = propentr.id
-		              where usrbas.username = act.author
-		           ) com_author_name,
-		           act.actionbody com_description,
-		           act.created com_created
-		      from qiss
-		      join jiraaction act
-		        on act.issueid = qiss.id
-		    union all
-		    select qiss.id iss_id,
-		           cg.author com_author,
-		           (select cast(propstr.propertyvalue as varchar(128))
-		              from userbase usrbas
-		              join propertyentry propentr
-		                on propentr.entity_name = 'OSUser' and
-		                   propentr.property_key = 'fullName' and
-		                   propentr.entity_id = usrbas.id
-		              join propertystring propstr
-		                on propstr.id = propentr.id
-		              where usrbas.username = cg.author
-		           ) com_author_name,
-		           list(
-		               ci.field || ': ' ||
-		                   coalesce(ci.oldstring || ' ', '') || coalesce('[ ' || ci.oldvalue || ' ]', '') ||
-		                   decode(coalesce(ci.oldstring || ci.oldvalue, ''), '', '', ' => ') ||
-		                   coalesce(ci.newstring || ' ', '') || coalesce('[ ' || ci.newvalue || ' ]', ''),
-		               ascii_char(13) || ascii_char(10)
-		           ) com_description,
-		           cg.created com_created
-		      from qiss
-		      join changegroup cg
-		        on cg.issueid = qiss.id
-		      join changeitem ci
-		        on ci.groupid = cg.id
-		      group by qiss.id, cg.id, cg.author, cg.created
-		)
-		select iss.pkey iss_pkey,
-		       pr.pkey iss_project,
-		       iss.reporter iss_reporter,
-		       (select cast(propstr.propertyvalue as varchar(128))
-		          from userbase usrbas
-		          join propertyentry propentr
-		            on propentr.entity_name = 'OSUser' and
-		               propentr.property_key = 'fullName' and
-		               propentr.entity_id = usrbas.id
-		          join propertystring propstr
-		            on propstr.id = propentr.id
-		          where usrbas.username = iss.reporter
-		       ) iss_reporter_name,
-		       iss.assignee iss_assignee,
-		       (select cast(propstr.propertyvalue as varchar(128))
-		          from userbase usrbas
-		          join propertyentry propentr
-		            on propentr.entity_name = 'OSUser' and
-		               propentr.property_key = 'fullName' and
-		               propentr.entity_id = usrbas.id
-		          join propertystring propstr
-		            on propstr.id = propentr.id
-		          where usrbas.username = iss.assignee
-		       ) iss_assignee_name,
-		       iss.summary iss_summary,
-		       iss.description iss_description,
-		       (select cfv.textvalue
-		          from customfieldvalue cfv
-		          join customfield cf
-		            on cf.id = cfv.customfield and
-		               cf.cfname = 'Test Details'
-		          where cfv.issue = iss.id
-		       ) iss_test_details,
-		       iss.environment iss_environment,
-		       iss.priority iss_priority,
-		       decode(res.pname,
-		           'Won''t Fix', 'wontfix',
-		           lower(res.pname)
-		       ) iss_resolution,
-		       sta.pname iss_status,
-		       lower(typ.pname) iss_type,
-		       iss.created iss_created,
-		       iss.updated iss_updated,
-		       (select max(chagro.created)
-		          from changegroup chagro
-		          join changeitem chaite
-		            on chaite.groupid = chagro.id
-		          where chaite.field = 'status' and
-		                chaite.newstring = 'Resolved' and
-		                chagro.issueid = iss.id
-		       ) iss_resolved,
-		       (select max(chagro.created)
-		          from changegroup chagro
-		          join changeitem chaite
-		            on chaite.groupid = chagro.id
-		          where chaite.field = 'status' and
-		                chaite.newstring = 'Closed' and
-		                chagro.issueid = iss.id
-		       ) iss_closed,
-		       iss.votes iss_votes,
-		       iss.security iss_security,
-		       (select decode(
-		                   cfv.stringvalue,
-		                   'Covered by another test(s)', 'covered by another tests',
-		                   'No test', null,
-		                   lower(cfv.stringvalue)
-		               )
-		          from customfieldvalue cfv
-		          join customfield cf
-		            on cf.id = cfv.customfield and
-		               cf.cfname = 'QA Status'
-		          where cfv.issue = iss.id
-		       ) iss_qa_status,
-		       (select cast(list(trim(projver.vname), ',') as varchar(6000))
-		          from nodeassociation nodass
-		          join projectversion projver
-		            on projver.id = nodass.sink_node_id
-		          where nodass.source_node_entity = 'Issue' and
-		                nodass.association_type = 'IssueVersion' and
-		                nodass.source_node_id = iss.id
-		       ) iss_versions,
-		       (select cast(list(trim(projver.vname), ',') as varchar(6000))
-		          from nodeassociation nodass
-		          join projectversion projver
-		            on projver.id = nodass.sink_node_id
-		          where nodass.source_node_entity = 'Issue' and
-		                nodass.association_type = 'IssueFixVersion' and
-		                nodass.source_node_id = iss.id
-		       ) iss_fix_versions,
-		       (select cast(list(lower(trim(com.cname)), ',') as varchar(6000))
-		          from nodeassociation nodass
-		          join component com
-		            on com.id = nodass.sink_node_id
-		          where nodass.source_node_entity = 'Issue' and
-		                nodass.association_type = 'IssueComponent' and
-		                nodass.source_node_id = iss.id
-		       ) iss_components,
-		       (select cast(list(decode(link.source, iss.id, linktype.outward, linktype.inward) || ':' || isu2.pkey, ',') as varchar(6000))
-		          from issuelink link
-		          join issuelinktype linktype
-		            on linktype.id = link.linktype
-		          join jiraissue isu2
-		            on isu2.id = decode(link.source, iss.id, link.destination, link.source)
-		          where (link.source = iss.id or link.destination = iss.id)
-		       ) iss_links,
-		       (select cast(list(att.id || ':' || att.filename, '|') as varchar(6000))
-		          from fileattachment att
-		          where att.issueid = iss.id
-		       ) iss_attachments,
-		       qcom.*
-		  from qiss
-		  join jiraissue iss
-		    on iss.id = qiss.id
-		  join project pr
-		    on pr.id = iss.project
-		  left join resolution res
-		    on res.id = iss.resolution
-		  left join issuestatus sta
-		    on sta.id = iss.issuestatus
-		  left join issuetype typ
-		    on typ.id = iss.issuetype
-		  left join qcom
-		    on qcom.iss_id = iss.id
-		  order by pr.id,
-		           cast(substring(iss.pkey from position('-' in iss.pkey) + 1) as numeric(10)),
-		           qcom.com_created
-		`);
 
 	const updateIssue = await attachment.prepare(transaction, `
 		update jiraissue
@@ -476,84 +292,277 @@ async function run() {
 		  where id = ?
 	`)
 
-	const jiraIssuesComments: JiraIssueComments[] = [];
-	let lastIssueComments: JiraIssueComments = null;
-
-	while (true) {
-		const rows = await resultSet.fetchAsObject<JiraIssue & JiraComment>();
-
-		if (rows.length == 0)
-			break;
-
-		for (const row of rows) {
-			if (row.ISS_ID != lastIssueComments?.issue.ISS_ID) {
-				lastIssueComments = Object.keys(row)
-					.filter(key => key.startsWith('ISS_'))
-					.reduce(
-						(obj: JiraIssueComments, key) => {
-							(obj.issue as any)[key] = (row as any)[key];
-							return obj;
-						},
-						{ issue: {}, comments: [] } as unknown as JiraIssueComments
-					);
-
-				jiraIssuesComments.push(lastIssueComments);
-			}
-
-			if (row.COM_DESCRIPTION) {
-				lastIssueComments.comments.push(Object.keys(row)
-					.filter(key => key.startsWith('COM_'))
-					.reduce(
-						(obj: JiraComment, key) => {
-							(obj as any)[key] = (row as any)[key];
-							return obj;
-						},
-						{} as JiraComment
-					)
-				);
-			}
-		}
-	}
-
-	const issues = await Promise.all(jiraIssuesComments.map(issue =>
-		createGitHubIssueComments(issue, collaborators.get(issue.issue.ISS_PROJECT))));
-
-	for (const issue of issues)
-	{
+	projLabel:
+	for (const project of projectList) {
+		const resultSet = await attachment.executeQuery(transaction, `
+			with qiss as (
+			    select iss.id
+			      from jiraissue iss
+			      join project pr
+			        on pr.id = iss.project
+			      where pr.pkey = ${project} and
+			            iss.gh_import_status_code is null
+			            ${suppressTicketsClause}
+			),
+			qcom as (
+			    select qiss.id com_iss_id,
+			           act.author com_author,
+			           (select cast(propstr.propertyvalue as varchar(128))
+			              from userbase usrbas
+			              join propertyentry propentr
+			                on propentr.entity_name = 'OSUser' and
+			                   propentr.property_key = 'fullName' and
+			                   propentr.entity_id = usrbas.id
+			              join propertystring propstr
+			                on propstr.id = propentr.id
+			              where usrbas.username = act.author
+			           ) com_author_name,
+			           act.actionbody com_description,
+			           act.created com_created
+			      from qiss
+			      join jiraaction act
+			        on act.issueid = qiss.id
+			    union all
+			    select qiss.id com_iss_id,
+			           cg.author com_author,
+			           (select cast(propstr.propertyvalue as varchar(128))
+			              from userbase usrbas
+			              join propertyentry propentr
+			                on propentr.entity_name = 'OSUser' and
+			                   propentr.property_key = 'fullName' and
+			                   propentr.entity_id = usrbas.id
+			              join propertystring propstr
+			                on propstr.id = propentr.id
+			              where usrbas.username = cg.author
+			           ) com_author_name,
+			           list(
+			               ci.field || ': ' ||
+			                   coalesce(ci.oldstring || ' ', '') || coalesce('[ ' || ci.oldvalue || ' ]', '') ||
+			                   decode(coalesce(ci.oldstring || ci.oldvalue, ''), '', '', ' => ') ||
+			                   coalesce(ci.newstring || ' ', '') || coalesce('[ ' || ci.newvalue || ' ]', ''),
+			               ascii_char(13) || ascii_char(10)
+			           ) com_description,
+			           cg.created com_created
+			      from qiss
+			      join changegroup cg
+			        on cg.issueid = qiss.id
+			      join changeitem ci
+			        on ci.groupid = cg.id
+			      where coalesce(octet_length(ci.oldstring), 0) < 300000 and
+			            coalesce(octet_length(ci.newstring), 0) < 300000
+			      group by qiss.id, cg.id, cg.author, cg.created
+			)
+			select iss.id iss_id,
+			       iss.pkey iss_pkey,
+			       pr.pkey iss_project,
+			       iss.reporter iss_reporter,
+			       (select cast(propstr.propertyvalue as varchar(128))
+			          from userbase usrbas
+			          join propertyentry propentr
+			            on propentr.entity_name = 'OSUser' and
+			               propentr.property_key = 'fullName' and
+			               propentr.entity_id = usrbas.id
+			          join propertystring propstr
+			            on propstr.id = propentr.id
+			          where usrbas.username = iss.reporter
+			       ) iss_reporter_name,
+			       iss.assignee iss_assignee,
+			       (select cast(propstr.propertyvalue as varchar(128))
+			          from userbase usrbas
+			          join propertyentry propentr
+			            on propentr.entity_name = 'OSUser' and
+			               propentr.property_key = 'fullName' and
+			               propentr.entity_id = usrbas.id
+			          join propertystring propstr
+			            on propstr.id = propentr.id
+			          where usrbas.username = iss.assignee
+			       ) iss_assignee_name,
+			       iss.summary iss_summary,
+			       iss.description iss_description,
+			       (select cfv.textvalue
+			          from customfieldvalue cfv
+			          join customfield cf
+			            on cf.id = cfv.customfield and
+			               cf.cfname = 'Test Details'
+			          where cfv.issue = iss.id
+			       ) iss_test_details,
+			       iss.environment iss_environment,
+			       iss.priority iss_priority,
+			       decode(res.pname,
+			           'Won''t Fix', 'wontfix',
+			           lower(res.pname)
+			       ) iss_resolution,
+			       sta.pname iss_status,
+			       lower(typ.pname) iss_type,
+			       iss.created iss_created,
+			       iss.updated iss_updated,
+			       (select max(chagro.created)
+			          from changegroup chagro
+			          join changeitem chaite
+			            on chaite.groupid = chagro.id
+			          where chaite.field = 'status' and
+			                chaite.newstring = 'Resolved' and
+			                chagro.issueid = iss.id
+			       ) iss_resolved,
+			       (select max(chagro.created)
+			          from changegroup chagro
+			          join changeitem chaite
+			            on chaite.groupid = chagro.id
+			          where chaite.field = 'status' and
+			                chaite.newstring = 'Closed' and
+			                chagro.issueid = iss.id
+			       ) iss_closed,
+			       iss.votes iss_votes,
+			       iss.security iss_security,
+			       (select decode(
+			                   cfv.stringvalue,
+			                   'Covered by another test(s)', 'covered by another tests',
+			                   'No test', null,
+			                   lower(cfv.stringvalue)
+			               )
+			          from customfieldvalue cfv
+			          join customfield cf
+			            on cf.id = cfv.customfield and
+			               cf.cfname = 'QA Status'
+			          where cfv.issue = iss.id
+			       ) iss_qa_status,
+			       (select cast(list(trim(projver.vname), ',') as varchar(6000))
+			          from nodeassociation nodass
+			          join projectversion projver
+			            on projver.id = nodass.sink_node_id
+			          where nodass.source_node_entity = 'Issue' and
+			                nodass.association_type = 'IssueVersion' and
+			                nodass.source_node_id = iss.id
+			       ) iss_versions,
+			       (select cast(list(trim(projver.vname), ',') as varchar(6000))
+			          from nodeassociation nodass
+			          join projectversion projver
+			            on projver.id = nodass.sink_node_id
+			          where nodass.source_node_entity = 'Issue' and
+			                nodass.association_type = 'IssueFixVersion' and
+			                nodass.source_node_id = iss.id
+			       ) iss_fix_versions,
+			       (select cast(list(lower(trim(com.cname)), ',') as varchar(6000))
+			          from nodeassociation nodass
+			          join component com
+			            on com.id = nodass.sink_node_id
+			          where nodass.source_node_entity = 'Issue' and
+			                nodass.association_type = 'IssueComponent' and
+			                nodass.source_node_id = iss.id
+			       ) iss_components,
+			       (select cast(list(decode(link.source, iss.id, linktype.outward, linktype.inward) || ':' || isu2.pkey, ',') as varchar(6000))
+			          from issuelink link
+			          join issuelinktype linktype
+			            on linktype.id = link.linktype
+			          join jiraissue isu2
+			            on isu2.id = decode(link.source, iss.id, link.destination, link.source)
+			          where (link.source = iss.id or link.destination = iss.id)
+			       ) iss_links,
+			       (select cast(list(att.id || ':' || att.filename, '|') as varchar(6000))
+			          from fileattachment att
+			          where att.issueid = iss.id
+			       ) iss_attachments,
+			       qcom.*
+			  from qiss
+			  join jiraissue iss
+			    on iss.id = qiss.id
+			  join project pr
+			    on pr.id = iss.project
+			  left join resolution res
+			    on res.id = iss.resolution
+			  left join issuestatus sta
+			    on sta.id = iss.issuestatus
+			  left join issuetype typ
+			    on typ.id = iss.issuetype
+			  left join qcom
+			    on qcom.com_iss_id = iss.id
+			  order by pr.id,
+			           cast(substring(iss.pkey from position('-' in iss.pkey) + 1) as numeric(10)),
+			           qcom.com_created
+			`);
 		try {
-			const ret = await request(`POST /repos/${config.projects[issue.jira.issue.ISS_PROJECT]}/import/issues`, {
-				headers: {
-					authorization: `token ${config.token}`,
-					accept: 'application/vnd.github.golden-comet-preview+json'
-				},
-				...issue.gitHub
-			});
+			const jiraIssuesComments: JiraIssueComments[] = [];
+			let lastIssueComments: JiraIssueComments = null;
 
-			console.info(`Importing ${issue.jira.issue.ISS_PKEY}: ${ret.status} - ${ret.data?.status}`);
+			while (true) {
+				const rows = await resultSet.fetchAsObject<JiraIssue & JiraComment>();
 
-			const resultBlob = await attachment.createBlob(transaction);
-			await resultBlob.write(Buffer.from(JSON.stringify(ret), 'utf-8'));
-			await resultBlob.close();
+				if (rows.length == 0)
+					break;
 
-			await updateIssue.execute(transaction, [
-				resultBlob,
-				ret.status,
-				ret.data?.id,
-				ret.data?.status,
-				ret.data?.url,
-				issue.jira.issue.ISS_ID
-			]);
+				for (const row of rows) {
+					if (row.ISS_ID != lastIssueComments?.issue.ISS_ID) {
+						lastIssueComments = Object.keys(row)
+							.filter(key => key.startsWith('ISS_'))
+							.reduce(
+								(obj: JiraIssueComments, key) => {
+									(obj.issue as any)[key] = (row as any)[key];
+									return obj;
+								},
+								{ issue: {}, comments: [] } as unknown as JiraIssueComments
+							);
 
-			await transaction.commitRetaining();
+						jiraIssuesComments.push(lastIssueComments);
+					}
+
+					if (row.COM_DESCRIPTION) {
+						lastIssueComments.comments.push(Object.keys(row)
+							.filter(key => key.startsWith('COM_'))
+							.reduce(
+								(obj: JiraComment, key) => {
+									(obj as any)[key] = (row as any)[key];
+									return obj;
+								},
+								{} as JiraComment
+							)
+						);
+					}
+				}
+			}
+
+			const issues = await Promise.all(jiraIssuesComments.map(issue =>
+				createGitHubIssueComments(issue, collaborators.get(issue.issue.ISS_PROJECT))));
+
+			for (const issue of issues)
+			{
+				try {
+					const ret = await request(`POST /repos/${config.projects[issue.jira.issue.ISS_PROJECT]}/import/issues`, {
+						headers: {
+							authorization: `token ${config.token}`,
+							accept: 'application/vnd.github.golden-comet-preview+json'
+						},
+						...issue.gitHub
+					});
+
+					console.info(`Importing ${issue.jira.issue.ISS_PKEY}: ${ret.status} - ${ret.data?.status}`);
+
+					const resultBlob = await attachment.createBlob(transaction);
+					await resultBlob.write(Buffer.from(JSON.stringify(ret), 'utf-8'));
+					await resultBlob.close();
+
+					await updateIssue.execute(transaction, [
+						resultBlob,
+						ret.status,
+						ret.data?.id,
+						ret.data?.status,
+						ret.data?.url,
+						issue.jira.issue.ISS_ID
+					]);
+
+					await transaction.commitRetaining();
+				}
+				catch (e) {
+					console.error(`Error importing ${issue.jira.issue.ISS_PKEY}: ${e}`);
+					break projLabel;
+				}
+			}
 		}
-		catch (e) {
-			console.error(`Error importing ${issue.jira.issue.ISS_PKEY}: ${e}`);
-			break;
+		finally {
+			await resultSet.close();
 		}
 	}
 
 	await updateIssue.dispose();
-	await resultSet.close();
 	await transaction.commit();
 	await attachment.disconnect();
 }
