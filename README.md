@@ -1,6 +1,7 @@
 # Import instructions
 
-- Ensure jira database is updated and clean from previous tests
+- Ensure Jira database is updated and clean from previous tests
+- Run `ddl.sql` script in the Jira database
 - Ensure `repositories` is cleaned from previous tests
 - Copy `.config.template.json` to `.config.json`
 - Configure `.config.json`
@@ -9,9 +10,8 @@
   - Set project mappings
   - Set usersMap mappings
   - Set attachments public and private project URLs
-- Edit CORE-2521 and CORE-5342 to decrease they size
 - Enable issues in each project
-- Create attachments repository and import files
+- Update attachments repositories
 - `yarn run clone-repositories`
 - `yarn run parse-logs`
 - `yarn run import`
@@ -19,3 +19,4 @@
 - Check import with `check.sql`
 - `yarn run write-result`
 - Commit `import-result.json`
+- Send `import-result.json` to configure the redirector
