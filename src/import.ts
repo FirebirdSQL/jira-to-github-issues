@@ -349,7 +349,8 @@ async function run() {
 			      join changeitem ci
 			        on ci.groupid = cg.id
 			      where coalesce(octet_length(ci.oldstring), 0) < 300000 and
-			            coalesce(octet_length(ci.newstring), 0) < 300000
+			            coalesce(octet_length(ci.newstring), 0) < 300000 and
+			            not (ci.fieldtype = 'jira' and ci.field = 'Comment' and ci.newvalue is null)
 			      group by qiss.id, cg.id, cg.author, cg.created
 			)
 			select iss.id iss_id,
