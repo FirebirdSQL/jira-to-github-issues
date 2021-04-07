@@ -38,6 +38,7 @@ interface JiraIssue {
 	ISS_SECURITY: number;
 	ISS_QA_STATUS: string;
 	ISS_RESOLUTION: string;
+	ISS_PRIORITY: string;
 	ISS_STATUS: string;
 	ISS_TYPE: string;
 }
@@ -189,6 +190,7 @@ async function createGitHubIssueComments(jira: JiraIssueComments, collaborators:
 		...affectVersions.map(s => `affect-version: ${s}`),
 		...fixVersions.map(s => `fix-version: ${s}`),
 		...(jira.issue.ISS_RESOLUTION ? [`resolution: ${jira.issue.ISS_RESOLUTION}`] : []),
+		...(jira.issue.ISS_PRIORITY ? [`priority: ${jira.issue.ISS_PRIORITY}`] : []),
 		...components.map(s => `component: ${s}`),
 		...(jira.issue.ISS_TYPE ? [`type: ${jira.issue.ISS_TYPE}`] : []),
 		...(jira.issue.ISS_QA_STATUS ? [`qa: ${jira.issue.ISS_QA_STATUS}`] : [])
@@ -393,6 +395,10 @@ async function run() {
 			           'Won''t Fix', 'wontfix',
 			           lower(res.pname)
 			       ) iss_resolution,
+			       (select lower(pri.pname)
+			          from priority pri
+			          where pri.id = iss.priority
+			       ) iss_priority,
 			       sta.pname iss_status,
 			       lower(typ.pname) iss_type,
 			       iss.created iss_created,
