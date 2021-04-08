@@ -44,6 +44,7 @@ interface JiraIssue {
 }
 
 interface JiraComment {
+	COM_TYPE: string;
 	COM_AUTHOR: string;
 	COM_AUTHOR_NAME: string;
 	COM_DESCRIPTION: Blob;
@@ -250,8 +251,11 @@ async function createGitHubIssueComments(jira: JiraIssueComments, collaborators:
 			},
 			comments: jira.comments.map((comment, index) => ({
 				body:
-					`Commented by: ${userName(comment.COM_AUTHOR, comment.COM_AUTHOR_NAME)}\n\n` +
-					transformReferences(textToMarkdown(simplifyJiraLinks(commentsDescriptions[index]))),
+					(comment.COM_TYPE == 'Modified by' ? '<details><summary>' : '') +
+					`${comment.COM_TYPE}: ${userName(comment.COM_AUTHOR, comment.COM_AUTHOR_NAME)}` +
+					(comment.COM_TYPE == 'Modified by' ? '</summary>\n\n' : '\n\n') +
+					transformReferences(textToMarkdown(simplifyJiraLinks(commentsDescriptions[index]))) +
+					(comment.COM_TYPE == 'Modified by' ? '\n</details>' : ''),
 				created_at: comment.COM_CREATED
 			}))
 		}
@@ -308,6 +312,7 @@ async function run() {
 			),
 			qcom as (
 			    select qiss.id com_iss_id,
+			           cast('Commented by' as varchar(12)) com_type,
 			           act.author com_author,
 			           (select cast(propstr.propertyvalue as varchar(128))
 			              from userbase usrbas
@@ -326,6 +331,7 @@ async function run() {
 			        on act.issueid = qiss.id
 			    union all
 			    select qiss.id com_iss_id,
+			           cast('Modified by' as varchar(12)) com_type,
 			           cg.author com_author,
 			           (select cast(propstr.propertyvalue as varchar(128))
 			              from userbase usrbas
