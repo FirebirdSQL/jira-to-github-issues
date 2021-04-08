@@ -340,9 +340,18 @@ async function run() {
 			           list(
 			               ci.field || ': ' ||
 			                   coalesce(ci.oldstring || ' ', '') || coalesce('[ ' || ci.oldvalue || ' ]', '') ||
-			                   decode(coalesce(ci.oldstring || ci.oldvalue, ''), '', '', ' => ') ||
+			                   iif(ci.oldstring is null and ci.oldvalue is null,
+			                       '',
+			                       iif(position(ascii_char(10) in ci.oldstring) > 0 or
+			                               position(ascii_char(10) in ci.oldvalue) > 0,
+			                           ascii_char(13) || ascii_char(10) || ascii_char(13) || ascii_char(10) ||
+			                               ' => ' ||
+			                               ascii_char(13) || ascii_char(10) || ascii_char(13) || ascii_char(10),
+			                           ' => '
+			                       )
+			                   ) ||
 			                   coalesce(ci.newstring || ' ', '') || coalesce('[ ' || ci.newvalue || ' ]', ''),
-			               ascii_char(13) || ascii_char(10)
+			               ascii_char(13) || ascii_char(10) || ascii_char(13) || ascii_char(10)
 			           ) com_description,
 			           cg.created com_created
 			      from qiss
